@@ -10,7 +10,7 @@ Self-contained bootstrap scripts for provisioning **ComfyUI + ComfyUI-Manager + 
 - **ComfyUI-Manager config:** Automatically sets `network_mode = personal_cloud` in `ComfyUI/user/__manager/config.ini`
 - **Access & Auto-start:**
   - Opens port `8188/tcp` in `ufw` (if active)
-  - Optional Cloudflare Quick Tunnel (`ENABLE_CLOUDFLARE_TUNNEL=1`)
+  - Cloudflare Quick Tunnel enabled by default (set `ENABLE_CLOUDFLARE_TUNNEL=0` to disable)
   - Registers `comfyui.service` and `comfyui-tunnel.service` in `systemd` so both auto-start after stopping/starting the GPU instance (falls back to `nohup` in container environments without `systemd`)
   - Installs `/usr/local/bin/comfy-url` to print the current Cloudflare tunnel URL anytime
 
@@ -32,7 +32,7 @@ Self-contained bootstrap scripts for provisioning **ComfyUI + ComfyUI-Manager + 
 No need to copy files, use `nano`, or put GitHub credentials on the GPU instance:
 
 ```bash
-ssh ubuntu@<INSTANCE_IP> 'ENABLE_CLOUDFLARE_TUNNEL=1 bash -s' < bootstrap_comfyui.sh
+ssh ubuntu@<INSTANCE_IP> 'bash -s' < bootstrap_comfyui.sh
 ```
 
 ### Option 2: Fetch from your private GitHub repo using a Personal Access Token (PAT)
@@ -42,15 +42,15 @@ On the GPU instance (or in your provider's startup script field):
 ```bash
 curl -fsSL -H "Authorization: Bearer <YOUR_GITHUB_PAT>" \
   https://raw.githubusercontent.com/seanmurph/comfyui-bootstrap/main/bootstrap_comfyui.sh \
-  | ENABLE_CLOUDFLARE_TUNNEL=1 bash
+  | bash
 ```
 
 ### Option 3: Clone the repo on the instance
 
 ```bash
 git clone https://github.com/seanmurph/comfyui-bootstrap.git
-cd <YOUR_REPO>
-ENABLE_CLOUDFLARE_TUNNEL=1 ./bootstrap_comfyui.sh
+cd comfyui-bootstrap
+./bootstrap_comfyui.sh
 ```
 
 ---
@@ -59,7 +59,7 @@ ENABLE_CLOUDFLARE_TUNNEL=1 ./bootstrap_comfyui.sh
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `ENABLE_CLOUDFLARE_TUNNEL` | `0` | Set to `1` to install `cloudflared` and start a Cloudflare Quick Tunnel |
+| `ENABLE_CLOUDFLARE_TUNNEL` | `1` | Set to `0` to disable `cloudflared` and the Cloudflare Quick Tunnel |
 | `ENABLE_SYSTEMD` | `1` | Set to `0` to skip `systemd` services and run via `nohup` |
 | `PORT` | `8188` | Port ComfyUI listens on |
 | `TORCH_INDEX_URL` | `https://download.pytorch.org/whl/cu128` | PyTorch wheel index (e.g. switch to `cu126` for older CUDA drivers) |
@@ -68,7 +68,7 @@ ENABLE_CLOUDFLARE_TUNNEL=1 ./bootstrap_comfyui.sh
 Example with custom CUDA version:
 
 ```bash
-ssh ubuntu@<INSTANCE_IP> 'ENABLE_CLOUDFLARE_TUNNEL=1 TORCH_INDEX_URL=https://download.pytorch.org/whl/cu126 bash -s' < bootstrap_comfyui.sh
+ssh ubuntu@<INSTANCE_IP> 'TORCH_INDEX_URL=https://download.pytorch.org/whl/cu126 bash -s' < bootstrap_comfyui.sh
 ```
 
 ---

@@ -8,7 +8,7 @@ set -euo pipefail
 
 PORT="${PORT:-8188}"
 TORCH_INDEX_URL="${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu128}"
-ENABLE_CLOUDFLARE_TUNNEL="${ENABLE_CLOUDFLARE_TUNNEL:-0}" # Set to 1 for Cloudflare Quick Tunnel
+ENABLE_CLOUDFLARE_TUNNEL="${ENABLE_CLOUDFLARE_TUNNEL:-1}" # Set to 0 to disable Cloudflare Quick Tunnel
 ENABLE_SYSTEMD="${ENABLE_SYSTEMD:-1}"                     # Set to 1 to auto-start on boot (when systemd is available)
 
 # Use /workspace if available and writable, otherwise $HOME (e.g., /home/ubuntu)
@@ -100,7 +100,7 @@ with open(cfg_path, "w") as f:
     cp.write(f)
 EOF
 
-echo "==> [6/7] Installing comfy-url helper & optional cloudflared..."
+echo "==> [6/7] Installing comfy-url & civitdl helpers + cloudflared..."
 $SUDO tee /usr/local/bin/comfy-url >/dev/null <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -119,6 +119,78 @@ echo "No Cloudflare tunnel URL found in tunnel.log yet." >&2
 exit 1
 EOF
 $SUDO chmod +x /usr/local/bin/comfy-url
+
+$SUDO tee /usr/local/bin/civitdl >/dev/null <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: civitdl [-d <dir>] <url> [output_filename]
+
+Environment variables:
+  CF_API_KEY       CivitAI API key (falls back to CIVITAI_API_KEY if unset)
+
+Options:
+  -d, --dir <dir>  Directory to save the downloaded file into
+  -h, --help       Show this help message
+USAGE
+}
+
+DEST_DIR=""
+POSITIONAL=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -d|--dir)
+      [[ $# -lt 2 ]] && { echo "Error: $1 requires a directory argument." >&2; exit 1; }
+      DEST_DIR="$2"
+      shift 2
+      ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; POSITIONAL+=("$@"); break ;;
+    -*) echo "Error: Unknown option: $1" >&2; usage >&2; exit 1 ;;
+    *) POSITIONAL+=("$1"); shift ;;
+  esac
+done
+
+[[ ${#POSITIONAL[@]} -lt 1 ]] && { usage >&2; exit 1; }
+
+URL="${POSITIONAL[0]}"
+OUT="${POSITIONAL[1]:-}"
+TOKEN="${CF_API_KEY:-${CIVITAI_API_KEY:-}}"
+USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+if [[ -n "$TOKEN" ]]; then
+  [[ "$URL" == *"?"* ]] && AUTH_URL="${URL}&token=${TOKEN}" || AUTH_URL="${URL}?token=${TOKEN}"
+else
+  echo "Warning: CF_API_KEY is not set; proceeding without auth token..." >&2
+  AUTH_URL="$URL"
+fi
+
+echo "Resolving link with curl..."
+FINAL_URL=$(curl -s -L -I -w '%{url_effective}' -o /dev/null --user-agent "$USER_AGENT" "$AUTH_URL" || true)
+if [[ -z "$FINAL_URL" || "$FINAL_URL" == "$AUTH_URL" ]]; then
+  FINAL_URL=$(curl -s -L -r 0-1 -w '%{url_effective}' -o /dev/null --user-agent "$USER_AGENT" "$AUTH_URL" || true)
+fi
+[[ -z "$FINAL_URL" ]] && { echo "Error: Failed to resolve download URL." >&2; exit 1; }
+
+echo "Link resolved. Handing off to aria2c..."
+ARIA_OPTS=(
+  -c -x16 -s16 -k1M -j1
+  --file-allocation=none
+  --summary-interval=0
+  --content-disposition=true
+  --user-agent="$USER_AGENT"
+  --header="Accept: */*"
+  --header="Referer: https://civitai.com/"
+)
+[[ -n "$DEST_DIR" ]] && { mkdir -p "$DEST_DIR"; ARIA_OPTS+=(-d "$DEST_DIR"); }
+[[ -n "$OUT" ]] && ARIA_OPTS+=(-o "$OUT")
+
+aria2c "${ARIA_OPTS[@]}" "$FINAL_URL"
+EOF
+$SUDO chmod +x /usr/local/bin/civitdl
 
 if [ "$ENABLE_CLOUDFLARE_TUNNEL" = "1" ] && ! command -v cloudflared >/dev/null 2>&1; then
   echo "    Installing cloudflared..."
