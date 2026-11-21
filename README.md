@@ -18,7 +18,8 @@ Self-contained bootstrap scripts for provisioning **ComfyUI + ComfyUI-Manager + 
 
 | File | Purpose |
 | --- | --- |
-| `bootstrap_comfyui.sh` | All-in-one setup script (installs everything, configures `systemd`, and installs `comfy-url`) |
+| `bootstrap_comfyui.sh` | All-in-one setup script (installs everything, configures `systemd`, and installs `comfy-url` & `civitdl`) |
+| `civitdl` | Standalone CivitAI downloader (`curl` redirect/auth resolver + multi-connection `aria2c`) |
 | `comfy-url` | Standalone copy of the helper installed to `/usr/local/bin/comfy-url` |
 | `setup_systemd.sh` | Standalone script to add `systemd` auto-start services to an already-provisioned instance |
 
@@ -94,7 +95,21 @@ sudo systemctl restart comfyui
 tail -f ~/ComfyUI/comfyui.log
 ```
 
-### Fast model downloads with `aria2c`
+### Fast model downloads with `civitdl` (CivitAI) and `aria2c`
+
+`bootstrap_comfyui.sh` installs `civitdl` to `/usr/local/bin/civitdl` automatically (or you can run `./civitdl` directly from this repo):
+
+```bash
+export CF_API_KEY="<your_civitai_api_key>"
+
+# Download into current directory (auto-detects filename)
+civitdl "https://civitai.com/api/download/models/123456"
+
+# Download into a specific ComfyUI folder with an optional custom filename
+civitdl -d ~/ComfyUI/models/checkpoints "https://civitai.com/api/download/models/123456" my_model.safetensors
+```
+
+For direct non-CivitAI URLs (e.g. Hugging Face):
 
 ```bash
 aria2c -x 16 -s 16 -k 1M -d ~/ComfyUI/models/checkpoints -o model.safetensors "<MODEL_URL>"
