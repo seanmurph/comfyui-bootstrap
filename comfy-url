@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Prints the latest Cloudflare Quick Tunnel URL from ComfyUI's tunnel.log
+for log in "/workspace/ComfyUI/tunnel.log" "$HOME/ComfyUI/tunnel.log" "/home/ubuntu/ComfyUI/tunnel.log"; do
+  if [ -f "$log" ]; then
+    url=$(grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' "$log" | tail -n1 || true)
+    if [ -n "$url" ]; then
+      echo "$url"
+      exit 0
+    fi
+  fi
+done
+
+echo "No Cloudflare tunnel URL found in tunnel.log yet." >&2
+exit 1
