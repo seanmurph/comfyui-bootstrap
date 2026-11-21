@@ -41,14 +41,14 @@ On the GPU instance (or in your provider's startup script field):
 
 ```bash
 curl -fsSL -H "Authorization: Bearer <YOUR_GITHUB_PAT>" \
-  https://raw.githubusercontent.com/<YOUR_USER>/<YOUR_REPO>/main/bootstrap_comfyui.sh \
+  https://raw.githubusercontent.com/seanmurph/comfyui-bootstrap/main/bootstrap_comfyui.sh \
   | ENABLE_CLOUDFLARE_TUNNEL=1 bash
 ```
 
 ### Option 3: Clone the repo on the instance
 
 ```bash
-git clone https://github.com/<YOUR_USER>/<YOUR_REPO>.git
+git clone https://github.com/seanmurph/comfyui-bootstrap.git
 cd <YOUR_REPO>
 ENABLE_CLOUDFLARE_TUNNEL=1 ./bootstrap_comfyui.sh
 ```
