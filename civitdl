@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# civitdl - Fast CivitAI downloader using curl (redirect/auth resolution) + aria2c
+#
+# Usage:
+#   CF_API_KEY="<your_key>" civitdl <url> [output_filename]
+#   CF_API_KEY="<your_key>" civitdl -d <dir> <url> [output_filename]
+# ==============================================================================
+
+usage() {
+  cat <<'EOF'
+Usage: civitdl [-d <dir>] <url> [output_filename]
+
+Environment variables:
+  CF_API_KEY       CivitAI API key (falls back to CIVITAI_API_KEY if unset)
+
+Options:
+  -d, --dir <dir>  Directory to save the downloaded file into
+  -h, --help       Show this help message
+
+Examples:
+  export CF_API_KEY="your_civitai_api_key"
+  civitdl "https://civitai.com/api/download/models/123456"
+  civitdl -d ~/ComfyUI/models/checkpoints "https://civitai.com/api/download/models/123456" my_model.safetensors
+EOF
+}
+
+DEST_DIR=""
+POSITIONAL=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -d|--dir)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: $1 requires a directory argument." >&2
+        exit 1
+      fi
+      DEST_DIR="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      POSITIONAL+=("$@")
+      break
+      ;;
+    -*)
+      echo "Error: Unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ${#POSITIONAL[@]} -lt 1 ]]; then
+  usage >&2
+  exit 1
+fi
+
+URL="${POSITIONAL[0]}"
+OUT="${POSITIONAL[1]:-}"
+TOKEN="${CF_API_KEY:-${CIVITAI_API_KEY:-}}"
+
+for cmd in curl aria2c; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Error: '$cmd' is required but not installed." >&2
+    exit 1
+  fi
+done
+
+USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+if [[ -n "$TOKEN" ]]; then
+  if [[ "$URL" == *"?"* ]]; then
+    AUTH_URL="${URL}&token=${TOKEN}"
+  else
+    AUTH_URL="${URL}?token=${TOKEN}"
+  fi
+else
+  echo "Warning: CF_API_KEY is not set; proceeding without auth token..." >&2
+  AUTH_URL="$URL"
+fi
+
+echo "Resolving link with curl..."
+
+# 1. Resolve final signed download URL (-w %{url_effective})
+# Use -I (HEAD) first to be fast; fallback to a tiny range GET if WAF blocks HEAD
+FINAL_URL=$(curl -s -L -I -w '%{url_effective}' -o /dev/null --user-agent "$USER_AGENT" "$AUTH_URL" || true)
+
+if [[ -z "$FINAL_URL" || "$FINAL_URL" == "$AUTH_URL" ]]; then
+  FINAL_URL=$(curl -s -L -r 0-1 -w '%{url_effective}' -o /dev/null --user-agent "$USER_AGENT" "$AUTH_URL" || true)
+fi
+
+if [[ -z "$FINAL_URL" ]]; then
+  echo "Error: Failed to resolve download URL." >&2
+  exit 1
+fi
+
+echo "Link resolved. Handing off to aria2c..."
+
+# 2. Download with aria2c (preserving browser headers for multi-connection downloads)
+ARIA_OPTS=(
+  -c -x16 -s16 -k1M -j1
+  --file-allocation=none
+  --summary-interval=0
+  --content-disposition=true
+  --user-agent="$USER_AGENT"
+  --header="Accept: */*"
+  --header="Referer: https://civitai.com/"
+)
+
+if [[ -n "$DEST_DIR" ]]; then
+  mkdir -p "$DEST_DIR"
+  ARIA_OPTS+=(-d "$DEST_DIR")
+fi
+
+if [[ -n "$OUT" ]]; then
+  ARIA_OPTS+=(-o "$OUT")
+fi
+
+aria2c "${ARIA_OPTS[@]}" "$FINAL_URL"
