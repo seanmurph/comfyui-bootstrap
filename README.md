@@ -6,7 +6,10 @@ Self-contained bootstrap scripts for provisioning **ComfyUI + ComfyUI-Manager + 
 
 - **System tools:** `aria2`, `git`, `curl`, `wget`, `ffmpeg`, `libgl1`, `libglib2.0-0`
 - **Python environment:** Installs [`uv`](https://docs.astral.sh/uv/) and creates a seeded Python 3.12 virtual environment (`--seed` includes `pip` for ComfyUI-Manager, while avoiding Ubuntu 24.04's `python3.12-venv` apt version mismatch)
-- **ComfyUI + ComfyUI-Manager:** Shallow-cloned (`--depth 1 --single-branch`) for fast downloads on slow links
+- **ComfyUI + custom nodes:** Shallow-cloned (`--depth 1 --single-branch`) for fast downloads on slow links:
+  - [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
+  - [ComfyUI-Manager](https://github.com/Comfy-Org/ComfyUI-Manager)
+  - [comfyui-civit-auto-dl](https://github.com/seanmurph/comfyui-civit-auto-dl)
 - **ComfyUI-Manager config:** Automatically sets `network_mode = personal_cloud` in `ComfyUI/user/__manager/config.ini`
 - **Access & Auto-start:**
   - Opens port `8188/tcp` in `ufw` (if active)

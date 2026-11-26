@@ -66,7 +66,7 @@ uv pip install --python "$COMFY_DIR/.venv/bin/python" --upgrade \
   torch torchvision torchaudio --index-url "$TORCH_INDEX_URL"
 uv pip install --python "$COMFY_DIR/.venv/bin/python" -r "$COMFY_DIR/requirements.txt"
 
-echo "==> [5/7] Installing & configuring ComfyUI-Manager (shallow clone)..."
+echo "==> [5/7] Installing custom nodes (ComfyUI-Manager, comfyui-civit-auto-dl)..."
 MANAGER_DIR="$COMFY_DIR/custom_nodes/ComfyUI-Manager"
 mkdir -p "$COMFY_DIR/custom_nodes"
 if [ ! -d "$MANAGER_DIR/.git" ]; then
@@ -77,6 +77,13 @@ fi
 
 if [ -f "$MANAGER_DIR/requirements.txt" ]; then
   uv pip install --python "$COMFY_DIR/.venv/bin/python" -r "$MANAGER_DIR/requirements.txt"
+fi
+
+CIVIT_AUTO_DL_DIR="$COMFY_DIR/custom_nodes/comfyui-civit-auto-dl"
+if [ ! -d "$CIVIT_AUTO_DL_DIR/.git" ]; then
+  git clone --depth 1 --single-branch https://github.com/seanmurph/comfyui-civit-auto-dl.git "$CIVIT_AUTO_DL_DIR"
+else
+  git -C "$CIVIT_AUTO_DL_DIR" pull --ff-only || true
 fi
 
 # Set network_mode = personal_cloud in $COMFY_DIR/user/__manager/config.ini
